@@ -62,5 +62,14 @@ namespace :praxis do
       generator.save!
     end
 
+    desc "Generate API docs (Swagger format) for a Praxis App"
+    task :swagger => [:environment] do |t, args|
+      require 'fileutils'
+
+      Praxis::Blueprint.caching_enabled = false
+      generator = Praxis::Docs::SwaggerGenerator.new(Dir.pwd)
+      generator.save!
+    end
+
   end
 end
