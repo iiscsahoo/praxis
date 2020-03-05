@@ -1,12 +1,21 @@
 require_relative 'openapi/info_object.rb'
 require_relative 'openapi/server_object.rb'
 require_relative 'openapi/paths_object.rb'
+require_relative 'openapi/tag_object.rb'
 
 module Praxis
   module Docs
 
     class OpenApiGenerator< Generator
       API_DOCS_DIRNAME = 'docs/openapi'
+
+      # TODO: DELETE??
+      def self.templatize( string )
+        # substitutes ":params_like_so" for {params_like_so}
+        converted  = Mustermann.new(string).to_templates.first
+        #puts "TEMPLATE: #{string} -> #{converted}"
+        converted
+      end
 
 
       def initialize(root)
@@ -59,27 +68,39 @@ module Praxis
           newfound = scan_dump_for_types( dumped, processed_types )
         end
         dumped_schemas = dump_schemas( processed_types )
+
         ###### END OF COPIED FROM BASE ####
 
         info_object = OpenApi::InfoObject.new(version: version, api_definition: version_info[:info])
         # We only support 1 server in Praxis
         server_object = OpenApi::ServerObject.new( url: version_info[:info][:base_path] )
         paths_object = OpenApi::PathsObject.new( resources: dumped_resources)
+
         full_data = {
           openapi: "3.0.2",
           info: info_object.dump,
-          servers: [server_object],
+          servers: [server_object.dump],
           paths: paths_object.dump,
-          consumes: normalize_media_types( version_info[:info][:consumes] ),
-          produces: normalize_media_types( version_info[:info][:produces] ),
+          # consumes: normalize_media_types( version_info[:info][:consumes] ),
+          # produces: normalize_media_types( version_info[:info][:produces] ),
 
-          definitions: convert_to_definitions_object( dumped_schemas ),
+          # definitions: convert_to_definitions_object( dumped_schemas ),
 
-          responses: {}, #TODO!! what do we get here? the templates?...need to transform to "Responses Definitions Object"
-          securityDefinitions: {}, # NOTE: No security definitions in Praxis
-          security: [], # NOTE: No security definitions in Praxis
-          tags: convert_traits_to_tags( version_info[:traits] || [] ) #Note: is this the right thing to do?
+          # responses: {}, #TODO!! what do we get here? the templates?...need to transform to "Responses Definitions Object"
+          # securityDefinitions: {}, # NOTE: No security definitions in Praxis
+          # security: [], # NOTE: No security definitions in Praxis
         }
+        
+        # It makes some weird things in ReDoc...
+        # Re-enable tags later
+        # traits = version_info[:traits] || []
+        # unless traits.empty?
+        #   full_data[:tags] = traits.collect do |name, info|
+        #     OpenApi::TagObject.new(name: name, info: info).dump
+        #   end
+        # end
+
+
         if parameter_object = convert_to_parameter_object( version_info[:info][:base_params] )
           full_data[:parameters] = parameter_object
         end
@@ -93,14 +114,6 @@ module Praxis
         File.open(filename+".json", 'w') {|f| f.write(json_data)}
         converted_full_data = JSON.parse( json_data ) # So symbols disappear
         File.open(filename+".yml", 'w') {|f| f.write(YAML.dump(converted_full_data))}
-      end
-
-      # TODO: DELETE??
-      def templatize( string )
-        # TODO: substitute ":params_like_so" for {params_like_so}
-        converted  = Mustermann.new(string).to_templates.first
-        puts "TEMPLATE: #{string} -> #{converted}"
-        converted
       end
 
       def dump_info_object( version, info )
@@ -158,13 +171,13 @@ module Praxis
           hash[info[:status]] = data
         end
       end
-      def dump_response_headers_object( headers )
-        puts "WARNING!! Finish this. It seems that headers for responses are never set in the hash??"
-        unless headers.empty?
-          binding.pry
-          puts headers
-        end
-      end
+      # def dump_response_headers_object( headers )
+      #   puts "WARNING!! Finish this. It seems that headers for responses are never set in the hash??"
+      #   unless headers.empty?
+      #     binding.pry
+      #     puts headers
+      #   end
+      # end
 
       def dump_response_examples_object( examples )
         examples.each_with_object({}) do |(name, info), hash|

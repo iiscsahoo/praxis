@@ -1,5 +1,6 @@
 require_relative 'parameter_object'
 require_relative 'request_body_object'
+require_relative 'responses_object'
 
 module Praxis
   module Docs
@@ -21,9 +22,9 @@ module Praxis
           h = {
             summary: action[:name].to_s,
             description: action[:description],
-            externalDocs: {}, # TODO/FIXME
+            #externalDocs: {}, # TODO/FIXME
             operationId: id,
-            responses: {}, # TODOdump_responses_object( action[:responses] )
+            responses: ResponsesObject.new(responses: action[:responses]).dump, 
             # callbacks
             # deprecated: false
             # security: [{}]

@@ -22,11 +22,10 @@ module Praxis
           # Key string (of MT) , value MTObject
           content_hash = info[:examples].each_with_object({}) do |(handler, example_hash),accum|
             content_type = example_hash[:content_type]
-            accum[content_type] = {
+            accum[content_type] = MediaTypeObject.new(
               schema: dumped_schema, # Every MT will have the same exact type..oh well
               example: info[:examples][handler][:body],
-              # encoding: TODO SUPPORT IT maybe be great/necessary for multipart
-            }
+            ).dump
           end
           # TODO! Handle Multipart types! they look like arrays now in the schema...etc
           h[:content] = content_hash

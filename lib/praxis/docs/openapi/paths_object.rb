@@ -31,7 +31,8 @@ module Praxis
           resource[:actions].each do |action|
             action[:urls].each do |url|
               verb = url[:verb].downcase
-              path_entry = paths[url[:path]] # ???? templatize( url[:path] )
+              templetized_path = OpenApiGenerator.templatize(url[:path])
+              path_entry = paths[templetized_path]
               # Let's fill in verb stuff within the working hash
               raise "VERB #{_verb} already defined for #{id}!?!?!" if path_entry[verb]
               
