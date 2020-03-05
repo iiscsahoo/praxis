@@ -51,7 +51,7 @@ module Praxis
   module Docs
     autoload :Generator, 'praxis/docs/generator'
     autoload :LinkBuilder, 'praxis/docs/link_builder'
-    autoload :SwaggerGenerator, 'praxis/docs/swagger_generator'
+    autoload :OpenApiGenerator, 'praxis/docs/open_api_generator'
   end
 
   # types

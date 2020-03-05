@@ -1,8 +1,12 @@
+require_relative 'openapi/info_object.rb'
+require_relative 'openapi/server_object.rb'
+require_relative 'openapi/paths_object.rb'
+
 module Praxis
   module Docs
 
-    class SwaggerGenerator< Generator
-      API_DOCS_DIRNAME = 'docs/swagger'
+    class OpenApiGenerator< Generator
+      API_DOCS_DIRNAME = 'docs/openapi'
 
 
       def initialize(root)
@@ -18,21 +22,13 @@ module Praxis
         collect_types
       end
 
-#      def save!
-#        # Restrict the versions listed in the index file to the ones for which we have at least 1 resource
-#        write_index_file( for_versions: resources_by_version.keys )
-#        resources_by_version.keys.each do |version|
-#          write_version_file(version)
-#        end
-#      end
-
       private
 
       def write_index_file( for_versions:  )
       end
 
       def write_version_file( version )
-
+        ###### COPIED FROM BASE ####
         version_info = infos_by_version[version]
         # Hack, let's "inherit/copy" all traits of a version from the global definition
         # Eventually traits should be defined for a version (and inheritable from global) so we'll emulate that here
@@ -40,24 +36,43 @@ module Praxis
         dumped_resources = dump_resources( resources_by_version[version] )
         found_media_types =  resources_by_version[version].select{|r| r.media_type}.collect {|r| r.media_type.describe }
 
-        collected_types = Set.new
-        collect_reachable_types( dumped_resources, collected_types )
+        # We'll start by processing the rendered mediatypes
+        processed_types = Set.new(resources_by_version[version].select do|r|
+          r.media_type && !r.media_type.is_a?(Praxis::SimpleMediaType)
+        end.collect(&:media_type))
+
+        newfound = Set.new
         found_media_types.each do |mt|
-          collect_reachable_types( { type: mt} , collected_types )
+          newfound += scan_dump_for_types( { type: mt} , processed_types )
         end
+        # Then will process the rendered resources (noting)
+        newfound += scan_dump_for_types( dumped_resources, Set.new )
 
-        dumped_info = dump_info_object( version, version_info[:info] )
-        dumped_schemas = dump_schemas( collected_types )
+        # At this point we've done a scan of the dumped resources and mediatypes.
+        # In that scan we've discovered a bunch of types, however, many of those might have appeared in the JSON
+        # rendered in just shallow mode, so it is not guaranteed that we've seen all the available types.
+        # For that we'll do a (non-shallow) dump of all the types we found, and scan them until the scans do not
+        # yield types we haven't seen before
+        while !newfound.empty? do
+          dumped = newfound.collect(&:describe)
+          processed_types += newfound
+          newfound = scan_dump_for_types( dumped, processed_types )
+        end
+        dumped_schemas = dump_schemas( processed_types )
+        ###### END OF COPIED FROM BASE ####
 
+        info_object = OpenApi::InfoObject.new(version: version, api_definition: version_info[:info])
+        # We only support 1 server in Praxis
+        server_object = OpenApi::ServerObject.new( url: version_info[:info][:base_path] )
+        paths_object = OpenApi::PathsObject.new( resources: dumped_resources)
         full_data = {
-          swagger: "2.0",
-          info: dumped_info,
-          host: version_info[:info][:endpoint],
-          basePath: templatize( version_info[:info][:base_path] ),
-          schemes: ['http','https'], # TODO! might want to add that to Praxis
+          openapi: "3.0.2",
+          info: info_object.dump,
+          servers: [server_object],
+          paths: paths_object.dump,
           consumes: normalize_media_types( version_info[:info][:consumes] ),
           produces: normalize_media_types( version_info[:info][:produces] ),
-          paths: dump_paths( dumped_resources ),
+
           definitions: convert_to_definitions_object( dumped_schemas ),
 
           responses: {}, #TODO!! what do we get here? the templates?...need to transform to "Responses Definitions Object"
@@ -71,15 +86,16 @@ module Praxis
         puts JSON.pretty_generate( full_data )
         # Write the file
         version_file = ( version == "n/a" ? "unversioned" : version )
-        filename = File.join(doc_root_dir, "swagger")
+        filename = File.join(doc_root_dir, "openapi")
 
-        puts "Generating swagger file : #{filename} (json and yml) "
+        puts "Generating Open API file : #{filename} (json and yml) "
         json_data = JSON.pretty_generate(full_data)
         File.open(filename+".json", 'w') {|f| f.write(json_data)}
         converted_full_data = JSON.parse( json_data ) # So symbols disappear
         File.open(filename+".yml", 'w') {|f| f.write(YAML.dump(converted_full_data))}
       end
 
+      # TODO: DELETE??
       def templatize( string )
         # TODO: substitute ":params_like_so" for {params_like_so}
         converted  = Mustermann.new(string).to_templates.first
@@ -122,56 +138,6 @@ module Praxis
         end
       end
 
-      def dump_paths( resources )
-        accum = {}
-        resources.each do |id, info|
-          dump_resource_paths( id, info , accum )
-        end
-        accum
-      end
-
-      def dump_resource_paths( id, resource , accum )
-        # Return a hash with a key for each path for each action/route
-        resource[:actions].each do |action|
-          raise "Fix multiple urls in an action! (by duplicating info)" if action[:urls].size > 1
-          url = action[:urls].first
-          _path = templatize( url[:path] )
-          _verb = url[:verb].downcase
-          unless accum[_path]
-            accum[_path] = {}
-          end
-          working  = accum[_path]
-          # Let's fill in verb stuff within the working hash
-          raise "VERB #{_verb} already defined for #{id}!?!?!" if working[ _verb ]
-          working[_verb] = dump_operation_object( url: url, action: action )
-          #working[:parameters] = [] # We always unlroll the parameters...we could potentially try to unroll them?...
-        end
-      end
-
-
-      def dump_operation_object( url: , action: )
-        header_attributes = action[:headers] ? action[:headers][:type][:attributes] : {}
-        param_attributes = action[:params] ? action[:params][:type][:attributes] : {}
-        x= {
-          summary: action[:name], #NOTE: Should we just leave it blank?
-          description: action[:description],
-          #TODO? operationId:
-          #TODO? consumes:
-          #TODO? produces:
-          #TODO? schemes:
-          #TODO? security:
-          #TODO? deprecated:
-          responses: dump_responses_object( action[:responses] )
-         }
-
-         x[:tags] = action[:traits] if action[:traits]
-         if parameters_object = dump_parameters_object( headers: header_attributes, params: param_attributes, payload: action[:payload])
-           x[:parameters] = parameters_object unless parameters_object.empty?
-         end
-
-#         puts JSON.pretty_generate(x)
-         x
-      end
 
       def dump_responses_object( responses )
         responses.each_with_object({}) do |(name, info), hash|
@@ -206,95 +172,8 @@ module Praxis
         end
       end
 
-      def dump_parameters_object( headers: , params: , payload: )
-        output = []
-        # An array, with one hash per param inside
 
-        (headers||{}).each_with_object(output) do |(name, info), out|
-          h = dump_single_parameters_object( name, info )
-          h[:in] = "header"
-          out << h
-        end
 
-        (params||{}).each_with_object(output) do |(name, info), out|
-          h = dump_single_parameters_object( name, info )
-          h[:in] = convert_parameter_location( info[:source] )
-          out << h
-        end
-
-#        # TODO!!!
-#        # If payload is multipart...then something's going on...
-#        # If it is a "form" ... then it is different...
-#        (payload||{}).each_with_object(output) do |(name, info), out|
-#          {
-#            name: name,
-#            in: 'body',
-#            description: info[:description],
-#            required: info[:required],
-#            schema: {}# TODO!!!!
-#          }
-#        end
-        output
-      end
-
-      def convert_parameter_location( praxis )
-        case praxis.to_sym
-        when :url
-          :path
-        when :body
-          :body
-        when :query
-          :query
-        when :header
-          :header
-        else
-          raise "Wait! unknown parameter location received: #{praxis}"
-        end
-      end
-      def dump_single_parameters_object( name, info )
-        h = { name: name }
-        h[:description] = info[:description] if info[:description]
-        h[:required] = info[:required] || false
-        h.merge!( dump_type_object( info ))
-      end
-
-      def dump_type_object( info )
-        h = {
-          type: convert_family_to_json_type( info[:type] )
-          #TODO: format?
-        }
-        h[:default] = info[:default] if info[:default]
-        h[:pattern] = info[:regexp] if info[:regexp]
-        # TODO: there are other possible things we can do..maximum, minimum...etc
-
-        if h[:type] == 'array'
-          h[:items] = dump_type_info( info[:type][:member_attribute] ) #??is this correct?
-        end
-        h
-      end
-      def convert_family_to_json_type( praxis_type )
-        case praxis_type[:family].to_sym
-        when :string
-          :string
-        when :hash
-          :object
-        when :numeric
-          case praxis_type[:id]
-          when 'Attributor-Integer'
-            :integer
-          when 'Attributor-BigDecimal'
-            :integer
-          when 'Attributor-Float'
-            :number
-          end
-        when :temporal
-          :string
-        when :boolean
-          :boolean
-        else
-          raise "Unknown praxis family type: #{praxis_type[:family]}"
-        end
-      end
 #      def dump_resources( resources )
 #        resources.each_with_object({}) do |r, hash|
 #          # Do not report undocumentable resources
