@@ -5,18 +5,19 @@ module Praxis
     module OpenApi
       class ParameterObject
         # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#parameter-object
-        attr_reader :location, :name, :info 
-        def initialize(location: , name: , info:)
+        attr_reader :location, :name, :is_required, :info
+        def initialize(location: , name:, is_required:,  info:)
           @location = location
           @name = name
           @info = info
+          @is_required = is_required
         end
 
         def dump
           # Fixed fields
           h = { name: name, in: location }
-          h[:description] = info[:description] if info[:description]
-          h[:required] = info[:required] || false
+          h[:description] = info.options[:description] if info.options[:description]
+          h[:required] = is_required if is_required
           # h[:deprecated] = false
           # h[:allowEmptyValue] ??? TODO: support in Praxis
 
@@ -36,75 +37,31 @@ module Praxis
           h
         end
 
-        def self.convert_parameter_location( praxis )
-          # FIXME: We are not supporting the cookie one
-          case praxis.to_sym
-          when :url
-            :path
-          when :query
-            :query
-          when :header
-            :header
-          else
-            raise "Wait! unknown parameter location received: #{praxis}"
-          end
-        end
-  
-        # def self.dump_single_parameters_object( location: , name: , info:  )
-        #   # Fixed fields
-        #   h = { name: name, in: location }
-        #   h[:description] = info[:description] if info[:description]
-        #   h[:required] = info[:required] || false
-        #   # h[:deprecated] = false
-        #   # h[:allowEmptyValue] ??? TODO: support in Praxis
-
-        #   # Other supported attributes
-        #   # style
-        #   # explode
-        #   # allowReserved
-          
-        #   # Now merge the rest schema and example
-        #   # schema
-        #   # example
-        #   # examples (Example and Examples are mutually exclusive)
-        #   schema = SchemaObject.new(info: info)
-        #   h[:schema] = schema.dump_schema
-        #   h[:example] = schema.dump_example
-        #   h
-        # end
-
-        def self.dump_parameters_object( headers: , params: , payload: )
+        def self.process_parameters( action )
           output = []
           # An array, with one hash per param inside  
-          (headers||{}).each_with_object(output) do |(name, info), out|
-            out << ParameterObject.new( location: 'header', name: name, info: info ).dump
+          if action.headers
+            (action.headers.attributes||{}).each_with_object(output) do |(name, info), out|
+              out << ParameterObject.new( location: 'header', name: name, is_required: info.options[:required], info: info ).dump
+            end
           end
   
-          (params||{}).each_with_object(output) do |(name, info), out|
-            in_type = convert_parameter_location( info[:source] )
-            out << ParameterObject.new( location: in_type, name: name, info: info ).dump
+          if action.params
+            route_params = \
+              if action.primary_route.nil?
+                warn "Warning: No routes defined for action #{action.name}"
+                []
+              else
+                action.primary_route.path.named_captures.keys.collect(&:to_sym)
+              end
+            (action.params.attributes||{}).each_with_object(output) do |(name, info), out|
+              in_type = route_params.include?(name) ? :path : :query
+              is_required = (in_type == :path ) ? true : info.options[:required]
+              out << ParameterObject.new( location: in_type, name: name, is_required: is_required, info: info ).dump
+            end
           end
-  
-  #        # TODO!!!
-  #        # If payload is multipart...then something's going on...
-  #        # If it is a "form" ... then it is different...
-  #        (payload||{}).each_with_object(output) do |(name, info), out|
-  #          {
-  #            name: name,
-  #            in: 'body',
-  #            description: info[:description],
-  #            required: info[:required],
-  #            schema: {}# TODO!!!!
-  #          }
-  #        end
-          output
-        end
-  
-        def self.process_parameters( action )
-          headers = action[:headers] ? action[:headers][:type][:attributes] : {}
-          params = action[:params] ? action[:params][:type][:attributes] : {}
 
-          dump_parameters_object( headers: headers, params: params, payload: action[:payload])
+          output
         end
       end
     end

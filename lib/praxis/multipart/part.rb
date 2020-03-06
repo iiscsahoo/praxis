@@ -28,6 +28,10 @@ module Praxis
       self
     end
 
+    def self.json_schema_type
+      :array
+    end
+
     def self.example(context=nil, options:{})
       if (payload_attribute = options[:payload_attribute])
         payload = payload_attribute.example(context + ['payload'])

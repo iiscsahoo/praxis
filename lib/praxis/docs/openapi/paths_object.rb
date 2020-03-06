@@ -20,23 +20,28 @@ module Praxis
 
 
         def dump
-          resources.each do |id, info|
-            compute_resource_paths( id, info)
+          resources.each do |resource|
+            compute_resource_paths( resource )
           end
           paths
         end
 
-        def compute_resource_paths( id, resource )
+        def compute_resource_paths( resource )
+          id = resource.id
           # fill in the paths hash with a key for each path for each action/route
-          resource[:actions].each do |action|
-            action[:urls].each do |url|
+          resource.actions.each do |action_name, action|
+            params_example =  action.params ? action.params.example(nil) : nil
+            urls = action.routes.collect do |route|
+              ActionDefinition.url_description(route: route, params: action.params, params_example: params_example)
+            end.compact
+            urls.each do |url|
               verb = url[:verb].downcase
               templetized_path = OpenApiGenerator.templatize(url[:path])
               path_entry = paths[templetized_path]
               # Let's fill in verb stuff within the working hash
               raise "VERB #{_verb} already defined for #{id}!?!?!" if path_entry[verb]
               
-              action_uid = "action-#{action[:name]}-#{id}"
+              action_uid = "action-#{action_name}-#{id}"
               # Add a tag matching the resource name (hoping all actions of a resource are grouped)
               action_tags = [id]
               path_entry[verb] = OperationObject.new( id: action_uid, url: url, action: action, tags: action_tags).dump

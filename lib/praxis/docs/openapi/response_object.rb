@@ -8,13 +8,17 @@ module Praxis
         attr_reader :info
         def initialize(info:)
           @info = info
+          default_handlers = ApiDefinition.instance.info.produces
+          @output_handlers = Praxis::Application.instance.handlers.select do |k,v|
+            default_handlers.include?(k)
+          end
         end
 
         def dump_response_headers_object( headers )
-          puts "WARNING!! Finish this. It seems that headers for responses are never set in the hash??"
           headers.each_with_object({}) do |(name,data),accum|
             # data is a hash with :value and :type keys
             # How did we say in that must match a value in json schema again??
+            binding.pry
             accum[name] = {
               schema: SchemaObject.new(info: data[:type])
               # allowed values:  [ data[:value] ] ??? is this the right json schema way?
@@ -23,36 +27,37 @@ module Praxis
         end
 
         def dump
-            data = { 
-              description: info[:description] || ''
-            }
-            if headers_object = dump_response_headers_object( info[:headers] )
-              data[:headers] = headers_object
-            end
+          data = { 
+            description: info.description || ''
+          }
+          if headers_object = dump_response_headers_object( info.headers )
+            data[:headers] = headers_object
+          end
 
-            if payload = info[:payload]
-              dumped_schema = SchemaObject.new(info: payload).dump_schema
-              # Key string (of MT) , value MTObject
-              content_hash = payload[:examples].each_with_object({}) do |(handler, example_hash),accum|
-                content_type = example_hash[:content_type]
-                accum[content_type] = MediaTypeObject.new(
-                  schema: dumped_schema, # Every MT will have the same exact type..oh well
-                  example: payload[:examples][handler][:body],
-                ).dump
-              end
-              data[:content] = content_hash
-            end
+          if info.media_type
 
-            # if payload = info[:payload]
-            #   body_type= payload[:id]
-            #   raise "WAIT! response payload doesn't have an existing id for the schema!!! (do an if, and describe it if so)" unless body_type
-            #   data[:schema] = {"$ref" => "#/definitions/#{body_type}" }
-            # end
-  
-            
-            # TODO: we do not support 'links'
-            data
+            identifier = MediaTypeIdentifier.load(info.media_type.identifier)
+            example_handlers = @output_handlers.each_with_object([]) do |(name, _handler), accum|
+              accum << { identifier => name}
+            end
+            data[:content] = MediaTypeObject.create_content_attribute_helper(
+                                                                            type: info.media_type, 
+                                                                            example_payload: info.example(nil),
+                                                                            example_handlers: example_handlers)
+          end
+
+          # if payload = info[:payload]
+          #   body_type= payload[:id]
+          #   raise "WAIT! response payload doesn't have an existing id for the schema!!! (do an if, and describe it if so)" unless body_type
+          #   data[:schema] = {"$ref" => "#/definitions/#{body_type}" }
+          # end
+
+          
+          # TODO: we do not support 'links'
+          data
         end
+
+        
       end
     end
   end

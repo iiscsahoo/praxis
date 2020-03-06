@@ -17,22 +17,22 @@ module Praxis
 
         def dump
           all_parameters = ParameterObject.process_parameters(action)
-          all_tags = tags
-          all_tags += action[:traits] if action[:traits]
+          all_tags = tags + action.traits
           h = {
-            summary: action[:name].to_s,
-            description: action[:description],
+            summary: action.name.to_s,
+            description: action.description,
             #externalDocs: {}, # TODO/FIXME
             operationId: id,
-            responses: ResponsesObject.new(responses: action[:responses]).dump, 
+            responses: ResponsesObject.new(responses: action.responses).dump, 
             # callbacks
             # deprecated: false
             # security: [{}]
             # servers: [{}]
           }
+
           h[:tags] = all_tags.uniq unless all_tags.empty?
           h[:parameters] = all_parameters unless all_parameters.empty?
-          h[:requestBody] = RequestBodyObject.new(info: action[:payload]).dump if action[:payload]
+          h[:requestBody] = RequestBodyObject.new(attribute: action.payload ).dump if action.payload
           h
         end
       end

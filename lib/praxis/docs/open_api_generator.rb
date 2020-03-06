@@ -25,23 +25,33 @@ module Praxis
         end
         initialize_directories(root)
 
-        Attributor::AttributeResolver.current = Attributor::AttributeResolver.new
-        collect_infos
+        Attributor::AttributeResolver.current = Attributor::AttributeResolver.new # ???
+        #collect_infos no need, the
+        @infos = ApiDefinition.instance.infos
         collect_resources
         collect_types
       end
 
       private
 
+      # def collect_infos
+      #   # All infos. Including keys for `:global`, "n/a", and any string version
+      #   binding.pry
+      #   @infos = ApiDefinition.instance.infos.each_with_object({}) do |(version,info), accum|
+      #     accum[version] = info
+      #   end
+      # end
+
+
       def write_index_file( for_versions:  )
       end
 
       def write_version_file( version )
         ###### COPIED FROM BASE ####
-        version_info = infos_by_version[version]
-        # Hack, let's "inherit/copy" all traits of a version from the global definition
-        # Eventually traits should be defined for a version (and inheritable from global) so we'll emulate that here
-        version_info[:traits] = infos_by_version[:traits]
+        # version_info = infos_by_version[version]
+        # # Hack, let's "inherit/copy" all traits of a version from the global definition
+        # # Eventually traits should be defined for a version (and inheritable from global) so we'll emulate that here
+        # version_info[:traits] = infos_by_version[:traits]
         dumped_resources = dump_resources( resources_by_version[version] )
         found_media_types =  resources_by_version[version].select{|r| r.media_type}.collect {|r| r.media_type.describe }
 
@@ -67,25 +77,22 @@ module Praxis
           processed_types += newfound
           newfound = scan_dump_for_types( dumped, processed_types )
         end
-        dumped_schemas = dump_schemas( processed_types )
-
         ###### END OF COPIED FROM BASE ####
+        # Here we have:
+        # processed types: which includes mediatypes and normal types...real classes
+        # processed resources for this version: resources_by_version[version]
 
-        info_object = OpenApi::InfoObject.new(version: version, api_definition: version_info[:info])
-        # We only support 1 server in Praxis
-        server_object = OpenApi::ServerObject.new( url: version_info[:info][:base_path] )
-        paths_object = OpenApi::PathsObject.new( resources: dumped_resources)
+        info_object = OpenApi::InfoObject.new(version: version, api_definition_info: @infos[version])
+        # We only support a server in Praxis ... so we'll use the base path
+        server_object = OpenApi::ServerObject.new( url: @infos[version].base_path )
+        
+        paths_object = OpenApi::PathsObject.new( resources: resources_by_version[version])
 
         full_data = {
           openapi: "3.0.2",
           info: info_object.dump,
           servers: [server_object.dump],
           paths: paths_object.dump,
-          # consumes: normalize_media_types( version_info[:info][:consumes] ),
-          # produces: normalize_media_types( version_info[:info][:produces] ),
-
-          # definitions: convert_to_definitions_object( dumped_schemas ),
-
           # responses: {}, #TODO!! what do we get here? the templates?...need to transform to "Responses Definitions Object"
           # securityDefinitions: {}, # NOTE: No security definitions in Praxis
           # security: [], # NOTE: No security definitions in Praxis
@@ -103,9 +110,9 @@ module Praxis
         full_data[:components] = {
           schemas: reusable_schema_objects(processed_types)
         }
-        if parameter_object = convert_to_parameter_object( version_info[:info][:base_params] )
-          full_data[:parameters] = parameter_object
-        end
+        # if parameter_object = convert_to_parameter_object( version_info[:info][:base_params] )
+        #   full_data[:parameters] = parameter_object
+        # end
         puts JSON.pretty_generate( full_data )
         # Write the file
         version_file = ( version == "n/a" ? "unversioned" : version )

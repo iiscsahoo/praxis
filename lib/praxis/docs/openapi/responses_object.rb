@@ -34,8 +34,8 @@ module Praxis
           #     }
           #   }
           # }
-          responses.each_with_object({}) do |(_response_name, response), hash|
-            hash[response[:status].to_s] = ResponseObject.new(info: response).dump
+          responses.each_with_object({}) do |(_response_name, response_definition), hash|
+            hash[response_definition.status.to_s] = ResponseObject.new(info: response_definition).dump
           end
         end
       end
