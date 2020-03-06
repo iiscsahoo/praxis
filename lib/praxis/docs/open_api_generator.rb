@@ -97,15 +97,20 @@ module Praxis
           # securityDefinitions: {}, # NOTE: No security definitions in Praxis
           # security: [], # NOTE: No security definitions in Praxis
         }
-        
-        # It makes some weird things in ReDoc...
-        # Re-enable tags later
-        # traits = version_info[:traits] || []
-        # unless traits.empty?
-        #   full_data[:tags] = traits.collect do |name, info|
-        #     OpenApi::TagObject.new(name: name, info: info).dump
-        #   end
-        # end
+
+        # Create the top level tags by:
+        # 1- First adding all the resource display names (and descriptions)
+        tags_for_resources = resources_by_version[version].collect do |resource|
+          OpenApi::TagObject.new(name: resource.display_name, description: resource.description ).dump
+        end
+        full_data[:tags] = tags_for_resources
+        # 2- Then adding all of the top level traits but marking them special with the x-traitTag (of Redoc)
+        tags_for_traits = (ApiDefinition.instance.traits).collect do |name, info|
+          OpenApi::TagObject.new(name: name, description: info.description).dump.merge(:'x-traitTag' => true)
+        end
+        unless tags_for_traits.empty?
+          full_data[:tags] = full_data[:tags] + tags_for_traits
+        end
 
         full_data[:components] = {
           schemas: reusable_schema_objects(processed_types)
@@ -125,17 +130,17 @@ module Praxis
         File.open(filename+".yml", 'w') {|f| f.write(YAML.dump(converted_full_data))}
       end
 
-      def dump_info_object( version, info )
-        full = {
-          title: info[:title],
-          description: info[:description],
-          #termsOfService: ???,
-          #contact: {}, #TODO
-          #license: {}, #TODO
-          version: version,
-          :'x-name' => info[:name]
-        }
-      end
+      # def dump_info_object( version, info )
+      #   full = {
+      #     title: info[:title],
+      #     description: info[:description],
+      #     #termsOfService: ???,
+      #     #contact: {}, #TODO
+      #     #license: {}, #TODO
+      #     version: version,
+      #     :'x-name' => info[:name]
+      #   }
+      # end
 
       def normalize_media_types( mtis )
         mtis.collect do |mti|

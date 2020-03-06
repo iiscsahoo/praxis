@@ -43,7 +43,7 @@ module Praxis
               
               action_uid = "action-#{action_name}-#{id}"
               # Add a tag matching the resource name (hoping all actions of a resource are grouped)
-              action_tags = [id]
+              action_tags = [resource.display_name]
               path_entry[verb] = OperationObject.new( id: action_uid, url: url, action: action, tags: action_tags).dump
             end
           end

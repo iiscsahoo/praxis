@@ -29,7 +29,6 @@ module Praxis
             # security: [{}]
             # servers: [{}]
           }
-
           h[:tags] = all_tags.uniq unless all_tags.empty?
           h[:parameters] = all_parameters unless all_parameters.empty?
           h[:requestBody] = RequestBodyObject.new(attribute: action.payload ).dump if action.payload

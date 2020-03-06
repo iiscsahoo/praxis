@@ -2,16 +2,16 @@ module Praxis
   module Docs
     module OpenApi
       class TagObject
-        attr_reader :name, :info
-        def initialize(name:,info: )
+        attr_reader :name, :description
+        def initialize(name:,description: )
           @name = name
-          @info = info
+          @description = description
         end
 
         def dump
           {
             name: name,
-            description: info[:description],
+            description: description,
             #externalDocs: ???,
           }
         end
