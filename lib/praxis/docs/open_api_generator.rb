@@ -100,7 +100,9 @@ module Praxis
         #   end
         # end
 
-
+        full_data[:components] = {
+          schemas: reusable_schema_objects(processed_types)
+        }
         if parameter_object = convert_to_parameter_object( version_info[:info][:base_params] )
           full_data[:parameters] = parameter_object
         end
@@ -134,11 +136,18 @@ module Praxis
          end
       end
 
-      def convert_to_definitions_object( schemas )
-        # TODO!! actually convert each of them
-        puts "TODO! convert to definitions object"
-        schemas
+      def reusable_schema_objects(types)
+        types.each_with_object({}) do |(type), accum|
+          the_type = \
+            if type.respond_to? :as_json_schema
+              type
+            else # If it is a blueprint ... for now, it'd be through the attribute
+              type.attribute
+            end
+          accum[type.id] = the_type.as_json_schema(shallow: false)
+        end
       end
+
       def convert_to_parameter_object( params )
         # TODO!! actually convert each of them
         puts "TODO! convert to parameter object"
@@ -186,30 +195,30 @@ module Praxis
       end
 
 
+      def dump_resources( resources )
+        resources.each_with_object({}) do |r, hash|
+          # Do not report undocumentable resources
+          next if r.metadata[:doc_visibility] == :none
+          context = [r.id]
+          resource_description = r.describe_openapi(context: context)
 
-#      def dump_resources( resources )
-#        resources.each_with_object({}) do |r, hash|
-#          # Do not report undocumentable resources
-#          next if r.metadata[:doc_visibility] == :none
-#          context = [r.id]
-#          resource_description = r.describe(context: context)
-#
-#          # strip actions with doc_visibility of :none
-#          resource_description[:actions].reject! { |a| a[:metadata][:doc_visibility] == :none }
-#
-#          # Go through the params/payload of each action and augment them by
-#          # adding a generated example (then stick it into the description hash)
-#          r.actions.each do |action_name, action|
-#            # skip actions with doc_visibility of :none
-#            next if action.metadata[:doc_visibility] == :none
-#
-#            action_description = resource_description[:actions].find {|a| a[:name] == action_name }
-#          end
-#
-#          hash[r.id] = resource_description
-#        end
-#      end
-#
+          # strip actions with doc_visibility of :none
+          resource_description[:actions].reject! { |a| a[:metadata][:doc_visibility] == :none }
+
+          # Go through the params/payload of each action and augment them by
+          # adding a generated example (then stick it into the description hash)
+          r.actions.each do |action_name, action|
+            # skip actions with doc_visibility of :none
+            next if action.metadata[:doc_visibility] == :none
+
+            action_description = resource_description[:actions].find {|a| a[:name] == action_name }
+          end
+
+          hash[r.id] = resource_description
+        end
+      end
+
+      #
 #      def dump_example_for(context_name, object)
 #        example = object.example(Array(context_name))
 #        if object.is_a? Praxis::Blueprint

@@ -28,7 +28,8 @@ module Praxis
           return { type: :object } unless info
 
           h = {
-            type: convert_family_to_json_type( info[:type] )
+            #type: convert_family_to_json_type( info[:type] )
+            type: info[:type]
             #TODO: format?
           }
           # required prop!!!??
