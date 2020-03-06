@@ -22,8 +22,9 @@ module Praxis
           unless example_handlers
             example_handlers = [ {'application/json' => 'json' } ] 
           end
-          # NOTE: maybe skip if it's a SimpleMediaType??
           # NOTE2: we should just create a $ref here unless it's an anon mediatype...
+          return {} if type.is_a? SimpleMediaType           # NOTE: skip if it's a SimpleMediaType?? ... is that correct?
+
           dumped_schema = SchemaObject.new(info: type).dump_schema
 
           if example_payload

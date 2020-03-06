@@ -121,7 +121,7 @@ module Praxis
         puts JSON.pretty_generate( full_data )
         # Write the file
         version_file = ( version == "n/a" ? "unversioned" : version )
-        filename = File.join(doc_root_dir, "openapi")
+        filename = File.join(doc_root_dir, "#{version_file}.openapi")
 
         puts "Generating Open API file : #{filename} (json and yml) "
         json_data = JSON.pretty_generate(full_data)
@@ -229,18 +229,6 @@ module Praxis
           hash[r.id] = resource_description
         end
       end
-
-      #
-#      def dump_example_for(context_name, object)
-#        example = object.example(Array(context_name))
-#        if object.is_a? Praxis::Blueprint
-#          example.render(view: :master)
-#        elsif object.is_a? Attributor::Attribute
-#          object.dump(example)
-#        else
-#          raise "Do not know how to dump this object (it is not a Blueprint or an Attribute): #{object}"
-#        end
-#      end
 
     end
   end
