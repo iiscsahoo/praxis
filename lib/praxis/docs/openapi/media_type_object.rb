@@ -33,10 +33,13 @@ module Praxis
             example_handlers.each do |spec|
               content_type, handler_name = spec.first
               handler = Praxis::Application.instance.handlers[handler_name]
-              examples_by_content_type[content_type] = handler.generate(rendered_payload)
+              # ReDoc is not happy to display json generated outputs when served as JSON...wtf?
+              generated = handler.generate(rendered_payload)
+              final = ( handler_name == 'json') ? JSON.parse(generated) : generated
+              examples_by_content_type[content_type] = final
             end
-
           end
+
           # Key string (of MT) , value MTObject
           content_hash = examples_by_content_type.each_with_object({}) do |(content_type, example_hash),accum|
             accum[content_type] = MediaTypeObject.new(

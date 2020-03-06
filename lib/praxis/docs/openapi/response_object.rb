@@ -38,7 +38,7 @@ module Praxis
 
             identifier = MediaTypeIdentifier.load(info.media_type.identifier)
             example_handlers = @output_handlers.each_with_object([]) do |(name, _handler), accum|
-              accum << { identifier => name}
+              accum.push({ (identifier + name).to_s => name})
             end
             data[:content] = MediaTypeObject.create_content_attribute_helper(
                                                                             type: info.media_type, 

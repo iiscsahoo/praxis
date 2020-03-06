@@ -153,6 +153,16 @@ module Praxis
         example
       end
 
+      def self.as_json_schema( shallow: false, example: nil, attribute_options: {} )
+        hash = { type: json_schema_type }
+        opts = self.options.merge( attribute_options )
+        hash[:description] = opts[:description] if opts[:description]
+        hash[:default] = opts[:default] if opts[:default]
+        # This class has items of different types...we need to investigate how to describe that in json schema
+        # hash[:items] = member_attribute.as_json_schema(example: member_example)
+        hash[:items] = { type: :string } # let's call them a string for now...
+        hash
+      end
 
       def self.describe(shallow=true, example: nil)
         type_name = Attributor.type_name(self)

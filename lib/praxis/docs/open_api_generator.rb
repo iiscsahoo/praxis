@@ -207,7 +207,7 @@ module Praxis
           # Do not report undocumentable resources
           next if r.metadata[:doc_visibility] == :none
           context = [r.id]
-          resource_description = r.describe_openapi(context: context)
+          resource_description = r.describe(context: context)
 
           # strip actions with doc_visibility of :none
           resource_description[:actions].reject! { |a| a[:metadata][:doc_visibility] == :none }
