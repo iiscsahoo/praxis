@@ -29,7 +29,7 @@ module Praxis
     end
 
     def self.json_schema_type
-      :array
+      :object
     end
 
     def self.example(context=nil, options:{})
@@ -56,8 +56,7 @@ module Praxis
                headers_attribute: headers_attribute,
                filename_attribute: filename_attribute)
     end
-
-
+    
     def self.describe(shallow=true, example: nil, options:{})
       hash = super(shallow, example: example)
 
